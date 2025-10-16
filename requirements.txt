@@ -1,1 +1,11 @@
-
+python-telegram-bot==20.7
+google-generativeai
+whisper
+plotly
+kaleido
+pandas
+sqlalchemy
+apscheduler
+pillow
+python-dotenv
+requests
