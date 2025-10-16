@@ -1,9 +1,15 @@
 import google.generativeai as genai
-import whisper
 import json
 import re
 from datetime import datetime, timedelta
 import config
+
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+    print("Whisper not available, voice processing disabled")
 
 class GeminiProcessor:
     def __init__(self):
@@ -14,10 +20,19 @@ class GeminiProcessor:
         self.model = genai.GenerativeModel('gemini-pro')
         
         # مدل Whisper برای تبدیل صوت به متن (رایگان)
-        self.whisper_model = whisper.load_model("base")
+        self.whisper_model = None
+        if WHISPER_AVAILABLE:
+            try:
+                self.whisper_model = whisper.load_model("base")
+            except Exception as e:
+                print(f"Error loading whisper model: {e}")
+                self.whisper_model = None
     
     def transcribe_audio(self, audio_path):
         """تبدیل ویس به متن با Whisper"""
+        if not self.whisper_model:
+            return "پردازش ویس در حال حاضر غیرفعال است. لطفاً از متن استفاده کنید."
+        
         try:
             result = self.whisper_model.transcribe(audio_path, language="fa")
             return result["text"]
