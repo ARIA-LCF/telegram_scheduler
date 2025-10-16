@@ -123,53 +123,64 @@ class TelegramSchedulerBot:
                     "• \"هر روز ساعت ۱۸ باشگاه برم\""
                 )
     
-    async def handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """پردازش پیام ویس"""
-        await update.message.reply_text("🔊 در حال پردازش ویس شما با Whisper و Gemini...")
+async def handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پردازش پیام ویس"""
+    await update.message.reply_text("🔊 در حال پردازش ویس شما...")
+    
+    # چک کردن فعال بودن ویس
+    if gemini.gemini_processor.whisper_model is None:
+        await update.message.reply_text(
+            "❌ پردازش ویس در حال حاضر غیرفعال است.\n\n"
+            "لطفاً از متن استفاده کنید یا ویس را به صورت دستی توصیف کنید."
+        )
+        return
+    
+    voice_file = await update.message.voice.get_file()
+    file_path = f"temp/voice_{update.effective_user.id}.ogg"
+    await voice_file.download_to_drive(file_path)
+    
+    # تبدیل ویس به متن با Whisper
+    transcribed_text = gemini.gemini_processor.transcribe_audio(file_path)
+    
+    if transcribed_text and not transcribed_text.startswith("پردازش ویس"):
+        await update.message.reply_text(f"📝 **متن استخراج شده:**\n{transcribed_text}")
         
-        voice_file = await update.message.voice.get_file()
-        file_path = f"temp/voice_{update.effective_user.id}.ogg"
-        await voice_file.download_to_drive(file_path)
+        # پردازش متن با Gemini
+        task_data = gemini.gemini_processor.parse_schedule_request(transcribed_text)
         
-        # تبدیل ویس به متن با Whisper
-        transcribed_text = gemini.gemini_processor.transcribe_audio(file_path)
-        
-        if transcribed_text:
-            await update.message.reply_text(f"📝 **متن استخراج شده:**\n{transcribed_text}")
+        if task_data and task_data.get('confidence', 0) > 0.3:
+            task = db.db.add_task(update.effective_user.id, task_data)
+            self.scheduler.schedule_task_reminder(task)
             
-            # پردازش متن با Gemini
-            task_data = gemini.gemini_processor.parse_schedule_request(transcribed_text)
+            response_text = (
+                f"✅ **تسک از ویس شما ثبت شد!**\n\n"
+                f"📝 {task_data['task_title']}\n"
+                f"🎯 نوع: {task_data['task_type']}\n"
+                f"📅 تاریخ: {task_data['scheduled_date']}\n"
+                f"⏰ زمان: {task_data['scheduled_time']}\n"
+                f"🔔 یادآوری: {task_data['reminder_before']} دقیقه قبل"
+            )
             
-            if task_data and task_data.get('confidence', 0) > 0.3:
-                task = db.db.add_task(update.effective_user.id, task_data)
-                self.scheduler.schedule_task_reminder(task)
-                
-                response_text = (
-                    f"✅ **تسک از ویس شما ثبت شد!**\n\n"
-                    f"📝 {task_data['task_title']}\n"
-                    f"🎯 نوع: {task_data['task_type']}\n"
-                    f"📅 تاریخ: {task_data['scheduled_date']}\n"
-                    f"⏰ زمان: {task_data['scheduled_time']}\n"
-                    f"🔔 یادآوری: {task_data['reminder_before']} دقیقه قبل"
-                )
-                
-                await update.message.reply_text(response_text, parse_mode='Markdown')
-            else:
-                await update.message.reply_text(
-                    "❌ متوجه محتوای ویس نشدم. لطفاً دوباره تلاش کنید.\n\n"
-                    "**مثال‌های صحیح:**\n"
-                    "\"فردا ساعت ده جلسه ریاضی دارم\"\n"
-                    "\"پس فردا امتحان فیزیک دارم\"\n"
-                    "\"شنبه ساعت دوازده جلسه کاری دارم\""
-                )
+            await update.message.reply_text(response_text, parse_mode='Markdown')
         else:
-            await update.message.reply_text("❌ خطا در پردازش ویس. لطفاً دوباره تلاش کنید.")
-        
-        # حذف فایل موقت
-        try:
-            os.remove(file_path)
-        except:
-            pass
+            await update.message.reply_text(
+                "❌ متوجه محتوای ویس نشدم. لطفاً دوباره تلاش کنید.\n\n"
+                "**مثال‌های صحیح:**\n"
+                "\"فردا ساعت ده جلسه ریاضی دارم\"\n"
+                "\"پس فردا امتحان فیزیک دارم\"\n"
+                "\"شنبه ساعت دوازده جلسه کاری دارم\""
+            )
+    else:
+        await update.message.reply_text(
+            "❌ خطا در پردازش ویس. لطفاً از متن استفاده کنید.\n\n"
+            "ویژگی پردازش ویس نیاز به نصب صحیح whisper دارد."
+        )
+    
+    # حذف فایل موقت
+    try:
+        os.remove(file_path)
+    except:
+        pass
     
     async def show_today_tasks(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """نمایش تسک‌های امروز"""
