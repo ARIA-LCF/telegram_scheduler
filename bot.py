@@ -235,4 +235,83 @@ class TelegramSchedulerBot:
         for date in sorted(tasks_by_date.keys()):
             schedule_text += f"📅 **{date}**\n"
             for task in tasks_by_date[date]:
-               
+                schedule_text += (
+                    f"  ⏰ {task.scheduled_time} - {task.title} ({task.task_type})\n"
+                )
+            schedule_text += "\n"
+        
+        await update.message.reply_text(schedule_text, parse_mode='Markdown')
+    
+    async def show_weekly_summary(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """نمایش نمودار بهره‌وری هفتگی"""
+        user_id = update.effective_user.id
+        
+        await update.message.reply_text("📈 در حال تولید نمودار بهره‌وری هفتگی...")
+        
+        chart_img = chart_gen.chart_generator.generate_productivity_chart(user_id)
+        
+        if chart_img:
+            await update.message.reply_photo(
+                photo=chart_img,
+                caption="📊 **نمودار بهره‌وری هفتگی شما**\n\n"
+                       "این نمودار عملکرد شما را در ۷ روز گذشته نشان می‌دهد."
+            )
+        else:
+            await update.message.reply_text(
+                "📊 داده کافی برای تولید نمودار وجود ندارد.\n"
+                "حداقل ۲ روز فعالیت نیاز است."
+            )
+    
+    async def show_default_schedule(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """نمایش برنامه پیش‌فرض"""
+        schedule_text = "⏰ **برنامه پیش‌فرض هوشمند:**\n\n"
+        
+        for time, activity in config.DEFAULT_SCHEDULE.items():
+            schedule_text += f"🕒 **{time}** - {activity}\n"
+        
+        schedule_text += (
+            "\n💡 **نکته:** اگر برنامه خاصی ثبت نکنید، این زمان‌بندی به صورت خودکار اجرا می‌شود "
+            "و یادآوری دریافت خواهید کرد."
+        )
+        
+        await update.message.reply_text(schedule_text, parse_mode='Markdown')
+    
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """دستور /help"""
+        help_text = (
+            "🤖 **راهنمای ربات برنامه‌ریزی هوشمند**\n\n"
+            "**دستورات اصلی:**\n"
+            "/start - شروع کار با ربات\n"
+            "/today - نمایش برنامه امروز\n"
+            "/schedule - برنامه‌های آینده\n"
+            "/summary - نمودار بهره‌وری\n"
+            "/add - اضافه کردن تسک جدید\n"
+            "/help - این راهنما\n\n"
+            "**نحوه استفاده:**\n"
+            "• متن بفرستید: \"فردا ساعت ۱۰ جلسه دارم\"\n"
+            "• ویس ضبط کنید: همین متن را بگویید\n"
+            "• از دکمه‌های کیبورد استفاده کنید\n\n"
+            "**فناوری‌های استفاده شده:**\n"
+            "🤖 Google Gemini AI - پردازش هوشمند\n"
+            "🔊 OpenAI Whisper - تبدیل ویس به متن\n"
+            "📊 Plotly - نمودارهای زیبا\n"
+            "⏰ APScheduler - زمان‌بندی پیشرفته"
+        )
+        
+        await update.message.reply_text(help_text, parse_mode='Markdown')
+    
+    async def handle_button_click(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """پردازش کلیک روی دکمه‌ها"""
+        query = update.callback_query
+        await query.answer()
+        await query.edit_message_text(text="این قابلیت به زودی اضافه خواهد شد!")
+    
+    def run(self):
+        """اجرای ربات"""
+        print("🤖 ربات برنامه‌ریزی هوشمند با Gemini AI در حال اجرا...")
+        print("🔧 فناوری‌ها: Google Gemini + Whisper + Plotly")
+        self.application.run_polling()
+
+if __name__ == "__main__":
+    bot = TelegramSchedulerBot()
+    bot.run()
